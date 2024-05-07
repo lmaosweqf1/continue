@@ -8,15 +8,24 @@ export class Telemetry {
   static extensionVersion: string | undefined = undefined;
 
   static async capture(event: string, properties: { [key: string]: any }) {
-    Telemetry.client?.capture({
-      distinctId: Telemetry.uniqueId,
-      event,
-      properties: {
-        ...properties,
-        os: Telemetry.os,
-        extensionVersion: Telemetry.extensionVersion,
-      },
-    });
+    // Telemetry.client?.capture({
+    //   distinctId: Telemetry.uniqueId,
+    //   event,
+    //   properties: {
+    //     ...properties,
+    //     os: Telemetry.os,
+    //     extensionVersion: Telemetry.extensionVersion,
+    //   },
+    // });
+    Telemetry.client?.trackBulk([{
+      action_name: event,
+      _id: Telemetry.uniqueId,
+      cvar: JSON.stringify(
+        Object.keys(properties).reduce((prev, currKey) => {
+          prev[currKey] = properties[currKey];
+        }, { os: Telemetry.os, extensionVersion: Telemetry.extensionVersion } as any)
+      )
+    }], () => {})
   }
 
   static shutdownPosthogClient() {
@@ -32,22 +41,16 @@ export class Telemetry {
     Telemetry.os = os.platform();
     Telemetry.extensionVersion = extensionVersion;
 
-    if (!allow) {
-      Telemetry.client = undefined;
-    } else {
-      try {
-        if (!Telemetry.client) {
-          const { PostHog } = await import("posthog-node");
-          Telemetry.client = new PostHog(
-            "phc_JS6XFROuNbhJtVCEdTSYk6gl5ArRrTNMpCcguAXlSPs",
-            {
-              host: "https://app.posthog.com",
-            },
-          );
-        }
-      } catch (e) {
-        console.error(`Failed to setup telemetry: ${e}`);
+    try {
+      if (!Telemetry.client) {
+        const { MatomoTracker } = await import("matomo-tracker");
+        const SITE_ID = 0;
+        const client = new MatomoTracker(SITE_ID, 'http://mywebsite.com/matomo.php');
+        Telemetry.client = client;
+        
       }
+    } catch (e) {
+      console.error(`Failed to setup telemetry: ${e}`);
     }
   }
 }
